@@ -2,28 +2,30 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>蓝牙 MCP 中继控制台</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #eee; margin: 0; padding: 20px; }
-        h1 { font-size: 20px; text-align: center; color: #00e5ff; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #eee; margin: 0; padding: 15px; }
+        h1 { font-size: 20px; text-align: center; color: #00e5ff; margin-bottom: 20px; }
         .card { background: #1e1e1e; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .status-bar { display: flex; justify-content: space-between; font-size: 14px; }
-        .status-ok { color: #4caf50; }
-        .status-err { color: #f44336; }
-        .control-group { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333; }
+        .status-ok { color: #4caf50; font-weight: bold; }
+        .status-err { color: #f44336; font-weight: bold; }
+        .control-group { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #333; }
         .control-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .control-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-        input[type="range"] { width: 100%; accent-color: #00e5ff; }
-        input[type="text"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; }
+        .control-label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 15px; color: #ccc; }
+        input[type="range"] { width: 100%; accent-color: #00e5ff; margin-bottom: 10px; }
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; box-sizing: border-box; margin-bottom: 10px; font-size: 14px; }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
         button:active { opacity: 0.7; }
-        .btn-start { background: #00e5ff; color: #000; width: 100%; margin-bottom: 0; padding: 15px; font-size: 18px; }
+        .btn-start { background: #00e5ff; color: #000; width: 100%; padding: 15px; font-size: 18px; margin-top: 5px; }
         .btn-test { background: #ff9800; color: #fff; }
         .btn-stop { background: #f44336; color: #fff; }
         .btn-action { background: #2196f3; color: #fff; }
-        #log-area { background: #000; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 8px; height: 150px; overflow-y: auto; word-break: break-all; }
+        .btn-action-alt { background: #e91e63; color: #fff; }
+        #log-area { background: #000; color: #0f0; font-family: monospace; font-size: 13px; padding: 10px; border-radius: 8px; height: 180px; overflow-y: auto; word-break: break-all; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -31,7 +33,7 @@
     <h1>🤖 蓝牙 MCP 中继控制台</h1>
 
     <div class="card">
-        <div style="font-size: 14px; margin-bottom: 5px;">🌐 MCP 服务器地址（请在此处粘贴你的公网地址）：</div>
+        <div style="font-size: 14px; margin-bottom: 8px; color: #aaa;">🌐 MCP 服务器地址：</div>
         <input type="text" id="mcp-url-input" placeholder="例如: https://xxxx.com/toy-next" value="">
         <button id="btn-start" class="btn-start">启动系统 (允许音频 & 连接蓝牙)</button>
     </div>
@@ -41,7 +43,7 @@
         <div>蓝牙: <span id="ble-status" class="status-err">未连接</span></div>
     </div>
 
-    <div id="control-panel" class="card" style="display: none;">
+    <div id="control-panel" class="card hidden">
         <!-- 震动 -->
         <div class="control-group">
             <div class="control-label"><span>震动强度</span><span id="val-vibrate">0</span></div>
@@ -72,20 +74,20 @@
         <!-- 加热 -->
         <div class="control-group">
             <div class="btn-group">
-                <button class="btn-action" style="background:#e91e63;" onclick="sendCommand('加热', 'ON')">开启加热</button>
+                <button class="btn-action-alt" onclick="sendCommand('加热', 'ON')">开启加热</button>
                 <button class="btn-action" style="background:#607d8b;" onclick="sendCommand('加热', 'OFF')">关闭加热</button>
             </div>
         </div>
 
         <!-- 测试与停止 -->
-        <div class="btn-group" style="margin-top: 20px;">
+        <div class="btn-group" style="margin-top: 25px;">
             <button class="btn-test" onclick="testConnection()">测试所有功能</button>
             <button class="btn-stop" onclick="stopAll()">🛑 停止所有功能</button>
         </div>
     </div>
 
     <div class="card">
-        <div style="font-size: 14px; margin-bottom: 5px;">📋 运行日志：</div>
+        <div style="font-size: 14px; margin-bottom: 8px; color: #aaa;">📋 运行日志：</div>
         <div id="log-area">等待启动...</div>
     </div>
 
@@ -95,8 +97,16 @@
     </audio>
 
     <script>
+        // ================= 配置区 =================
+        let currentMcpUrl = ''; 
+        // BLE UUID 配置
+        const SERVICE_UUID = 'AE30'; // 连接后看到的服务
+        const WRITE_UUID = 'AE01';   // 写入特征
+        const NOTIFY_UUID = 'AE02';  // 通知特征
+        const ADVERTISED_UUID = 'F0F0'; // 广播服务 (很重要，添加它以确保iOS能找到设备)
+        // ==========================================
+
         let mcpPollingTimer = null;
-        let currentMcpUrl = ''; // 动态存放地址
         let bleDevice = null;
         let bleServer = null;
         let bleWriteCharacteristic = null;
@@ -106,12 +116,8 @@
         const mcpStatus = document.getElementById('mcp-status');
         const bleStatus = document.getElementById('ble-status');
         const audio = document.getElementById('keep-alive-audio');
-        
-        // BLE 的 UUID 固定，无需变动
-        const BLE_SERVICE_UUID = 'AE30'; 
-        const BLE_WRITE_UUID = 'AE01';   
-        const BLE_NOTIFY_UUID = 'AE02';  
 
+        // 日志记录
         function log(msg, isError = false) {
             const time = new Date().toLocaleTimeString();
             const color = isError ? '#f44336' : '#0f0';
@@ -119,8 +125,14 @@
             logArea.scrollTop = logArea.scrollHeight;
         }
 
+        // 16位 UUID 转 128位标准格式
+        function getFullUUID(uuid) {
+            return uuid.length === 4 ? `0000${uuid}-0000-1000-8000-00805f9b34fb` : uuid;
+        }
+
+        // 音频保活
         function startAudioKeepAlive() {
-            audio.volume = 0.01;
+            audio.volume = 0.01; // 几乎静音
             audio.play().then(() => {
                 log('无声音频保活已启动');
             }).catch(e => {
@@ -128,32 +140,37 @@
             });
         }
 
+        // 连接蓝牙
         async function connectBluetooth() {
             try {
-                log('正在请求蓝牙设备...');
-                const getFullUUID = (uuid) => uuid.length === 4 ? `0000${uuid}-0000-1000-8000-00805f9b34fb` : uuid;
-                
+                log('正在扫描蓝牙设备...');
+                // ⚠️ 关键修改：使用 namePrefix 而不是 services，避免iOS过滤掉设备
+                // optionalServices 必须包含我们后续需要访问的 AE30 和广播的 F0F0
                 bleDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [getFullUUID(BLE_SERVICE_UUID)] }],
-                    optionalServices: [getFullUUID(BLE_SERVICE_UUID)]
+                    filters: [{ namePrefix: 'SL' }], 
+                    optionalServices: [getFullUUID(SERVICE_UUID), getFullUUID(ADVERTISED_UUID)]
                 });
 
                 bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+                log('正在连接 GATT 服务器...');
                 bleServer = await bleDevice.gatt.connect();
-                const service = await bleServer.getPrimaryService(getFullUUID(BLE_SERVICE_UUID));
                 
-                bleWriteCharacteristic = await service.getCharacteristic(getFullUUID(BLE_WRITE_UUID));
-                const notifyCharacteristic = await service.getCharacteristic(getFullUUID(BLE_NOTIFY_UUID));
+                log('正在获取主服务...');
+                const service = await bleServer.getPrimaryService(getFullUUID(SERVICE_UUID));
+                
+                bleWriteCharacteristic = await service.getCharacteristic(getFullUUID(WRITE_UUID));
+                const notifyCharacteristic = await service.getCharacteristic(getFullUUID(NOTIFY_UUID));
 
+                // 开启通知
                 await notifyCharacteristic.startNotifications();
                 notifyCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
                     const value = new TextDecoder().decode(event.target.value);
-                    log(`收到蓝牙通知: ${value}`);
+                    log(`收到通知: ${value}`);
                 });
 
                 bleStatus.innerText = '已连接';
                 bleStatus.className = 'status-ok';
-                log('蓝牙连接成功！');
+                log('🎉 蓝牙连接成功！');
                 return true;
             } catch (error) {
                 log('蓝牙连接失败: ' + error.message, true);
@@ -170,6 +187,7 @@
             bleWriteCharacteristic = null;
         }
 
+        // 蓝牙发送数据
         async function writeBLE(data) {
             if (!bleWriteCharacteristic) {
                 log('蓝牙未连接，无法发送', true);
@@ -177,19 +195,23 @@
             }
             try {
                 const encoder = new TextEncoder();
+                // 目前默认将数据转为 JSON 字符串发送。
+                // 如果以后你抓到 iRobot 的十六进制指令，记得在这里改成 new Uint8Array([...])
                 const payload = encoder.encode(JSON.stringify(data));
                 await bleWriteCharacteristic.writeValue(payload);
-                log(`蓝牙发送成功: ${JSON.stringify(data)}`);
+                log(`发送成功: ${JSON.stringify(data)}`);
             } catch (error) {
-                log('蓝牙发送失败: ' + error.message, true);
+                log('发送失败: ' + error.message, true);
             }
         }
 
+        // MCP 轮询 (300ms)
         function startMCPPolling() {
             if (isPolling) return;
             isPolling = true;
             mcpStatus.innerText = '运行中';
             mcpStatus.className = 'status-ok';
+            log('MCP 轮询已启动 (300ms)');
 
             mcpPollingTimer = setInterval(async () => {
                 try {
@@ -197,7 +219,7 @@
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     
                     const data = await response.json();
-                    
+                    // 静默跳过 null
                     if (data && data.command === null) return;
 
                     if (data && data.command && data.command.action) {
@@ -205,23 +227,24 @@
                         handleIncomingCommand(data.command.action, data.command.value);
                     }
                 } catch (e) {
-                    // 静默处理网络波动，防止日志刷屏
+                    // 静默失败，防止网络波动刷屏
                 }
             }, 300);
-            log('MCP 服务器轮询已启动 (300ms)');
         }
 
+        // 处理指令
         function handleIncomingCommand(action, value) {
-            // 目前默认将 MCP 指令转为 JSON 发给蓝牙。
-            // 等你知道 iRobot 的十六进制指令后，可以在这里修改。
+            // 这里是核心转换逻辑。目前直接发送 JSON
             writeBLE({ action: action, value: value });
         }
 
+        // 手动触发指令
         function sendCommand(action, value) {
             log(`⬆️ 手动发送: ${action} - ${value}`);
             handleIncomingCommand(action, value);
         }
 
+        // 停止所有
         function stopAll() {
             if (mcpPollingTimer) {
                 clearInterval(mcpPollingTimer);
@@ -234,20 +257,19 @@
             if (bleWriteCharacteristic) {
                 writeBLE({ action: 'stop', value: 0 });
             }
-            
             log('🛑 已停止所有功能和轮询');
         }
 
+        // 测试按钮
         function testConnection() {
             log('▶️ 测试功能...');
             sendCommand('测试', 1);
         }
 
-        // 启动按钮逻辑
+        // 启动按钮点击事件
         document.getElementById('btn-start').addEventListener('click', async () => {
             const urlInput = document.getElementById('mcp-url-input').value.trim();
             
-            // 检查是否填了地址
             if (!urlInput) {
                 alert('请先在上方输入 MCP 服务器地址！');
                 return;
@@ -255,10 +277,15 @@
             
             currentMcpUrl = urlInput;
             document.getElementById('btn-start').style.display = 'none';
-            document.getElementById('control-panel').style.display = 'block';
+            document.getElementById('control-panel').classList.remove('hidden');
             
+            // 1. 启动音频保活
             startAudioKeepAlive();
+            
+            // 2. 连接蓝牙
             const connected = await connectBluetooth();
+            
+            // 3. 蓝牙连上了才启动轮询
             if (connected) {
                 startMCPPolling();
             }
