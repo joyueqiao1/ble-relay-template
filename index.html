@@ -275,21 +275,46 @@
 
         // ================= 蓝牙发送数据 =================
         async function writeBLE(data) {
+            if (!bleWriteCharacteristic) return;
+            try {
+                const encoder = new TextEncoder();
+                await bleWriteCharacteristic.writeValue(encoder.encode(JSON.stringify(data)));
+                log(`发送 JSON: ${JSON.stringify(data)}`);
+            } catch (error) { log('发送失败: ' + error.message, true); }
+        }
+
+        // 🔥 新增：直接发送十六进制字节（测试用）
+        async function writeHex(bytesArray) {
             if (!bleWriteCharacteristic) {
-                log('蓝牙未连接，无法发送指令', true);
+                log('蓝牙未连接，无法发送', true);
                 return;
             }
             try {
-                const encoder = new TextEncoder();
-                // 目前默认发送 JSON 字符串，未来如果抓到十六进制指令，改成 Uint8Array
-                const payload = encoder.encode(JSON.stringify(data));
+                const payload = new Uint8Array(bytesArray);
                 await bleWriteCharacteristic.writeValue(payload);
-                log(`发送蓝牙指令成功: ${JSON.stringify(data)}`);
+                log(`发送十六进制成功: [${bytesArray.map(b=>'0x'+b.toString(16)).join(', ')}]`);
             } catch (error) {
-                log('蓝牙发送失败: ' + error.message, true);
+                log('发送十六进制失败: ' + error.message, true);
             }
         }
 
+        // ================= 指令转换逻辑 =================
+        function handleIncomingCommand(action, value) {
+            if (action === '测试') {
+                log('尝试发送测试握手信号...');
+                // 尝试1：发送文字 "start" 的字节
+                writeHex([0x73, 0x74, 0x61, 0x72, 0x74]);
+                
+                // 尝试2：发送单字节 0x01 (如果 "start" 无效，可以删掉上面的，把下面这行前面的 // 去掉测试)
+                // writeHex([0x01]); 
+            } else if (action === '震动') {
+                // 假设震动指令是 0x05 (未验证)
+                writeHex([0x05]);
+            } else {
+                // 其他指令暂时还是发 JSON
+                writeBLE({ action: action, value: value });
+            }
+        }
         // ================= MCP 轮询 (300ms) =================
         function startMCPPolling() {
             if (isPolling) return;
