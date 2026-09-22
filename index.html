@@ -15,22 +15,26 @@
         .control-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         .control-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
         input[type="range"] { width: 100%; accent-color: #00e5ff; }
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
         button:active { opacity: 0.7; }
-        .btn-start { background: #00e5ff; color: #000; width: 100%; margin-bottom: 15px; padding: 15px; font-size: 18px; }
+        .btn-start { background: #00e5ff; color: #000; width: 100%; margin-bottom: 0; padding: 15px; font-size: 18px; }
         .btn-test { background: #ff9800; color: #fff; }
         .btn-stop { background: #f44336; color: #fff; }
         .btn-action { background: #2196f3; color: #fff; }
         #log-area { background: #000; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 8px; height: 150px; overflow-y: auto; word-break: break-all; }
-        .hidden { display: none; }
     </style>
 </head>
 <body>
 
     <h1>🤖 蓝牙 MCP 中继控制台</h1>
 
-    <button id="btn-start" class="btn-start">启动系统 (允许音频 & 连接蓝牙)</button>
+    <div class="card">
+        <div style="font-size: 14px; margin-bottom: 5px;">🌐 MCP 服务器地址（请在此处粘贴你的公网地址）：</div>
+        <input type="text" id="mcp-url-input" placeholder="例如: https://xxxx.com/toy-next" value="">
+        <button id="btn-start" class="btn-start">启动系统 (允许音频 & 连接蓝牙)</button>
+    </div>
 
     <div class="card status-bar">
         <div>MCP: <span id="mcp-status" class="status-err">未连接</span></div>
@@ -91,14 +95,8 @@
     </audio>
 
     <script>
-        // ================= 配置区 (请在此处修改) =================
-        const MCP_SERVER_URL = '/toy-next'; // ⚠️ 请替换为你的公网 MCP 地址，例如 https://xxx.com/toy-next
-        const BLE_SERVICE_UUID = 'AE30';     // 用户指定的服务 UUID
-        const BLE_WRITE_UUID = 'AE01';       // 写入特征
-        const BLE_NOTIFY_UUID = 'AE02';      // 通知特征
-        // ========================================================
-
         let mcpPollingTimer = null;
+        let currentMcpUrl = ''; // 动态存放地址
         let bleDevice = null;
         let bleServer = null;
         let bleWriteCharacteristic = null;
@@ -108,8 +106,12 @@
         const mcpStatus = document.getElementById('mcp-status');
         const bleStatus = document.getElementById('ble-status');
         const audio = document.getElementById('keep-alive-audio');
+        
+        // BLE 的 UUID 固定，无需变动
+        const BLE_SERVICE_UUID = 'AE30'; 
+        const BLE_WRITE_UUID = 'AE01';   
+        const BLE_NOTIFY_UUID = 'AE02';  
 
-        // 日志输出
         function log(msg, isError = false) {
             const time = new Date().toLocaleTimeString();
             const color = isError ? '#f44336' : '#0f0';
@@ -117,9 +119,8 @@
             logArea.scrollTop = logArea.scrollHeight;
         }
 
-        // 初始化音频保活
         function startAudioKeepAlive() {
-            audio.volume = 0.01; // 极小音量
+            audio.volume = 0.01;
             audio.play().then(() => {
                 log('无声音频保活已启动');
             }).catch(e => {
@@ -127,11 +128,9 @@
             });
         }
 
-        // 蓝牙连接逻辑
         async function connectBluetooth() {
             try {
                 log('正在请求蓝牙设备...');
-                // 处理 16 位 UUID 字符串转 128 位标准
                 const getFullUUID = (uuid) => uuid.length === 4 ? `0000${uuid}-0000-1000-8000-00805f9b34fb` : uuid;
                 
                 bleDevice = await navigator.bluetooth.requestDevice({
@@ -146,7 +145,6 @@
                 bleWriteCharacteristic = await service.getCharacteristic(getFullUUID(BLE_WRITE_UUID));
                 const notifyCharacteristic = await service.getCharacteristic(getFullUUID(BLE_NOTIFY_UUID));
 
-                // 开启通知
                 await notifyCharacteristic.startNotifications();
                 notifyCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
                     const value = new TextDecoder().decode(event.target.value);
@@ -172,7 +170,6 @@
             bleWriteCharacteristic = null;
         }
 
-        // 蓝牙发送数据
         async function writeBLE(data) {
             if (!bleWriteCharacteristic) {
                 log('蓝牙未连接，无法发送', true);
@@ -188,7 +185,6 @@
             }
         }
 
-        // MCP 轮询逻辑 (300ms)
         function startMCPPolling() {
             if (isPolling) return;
             isPolling = true;
@@ -197,12 +193,11 @@
 
             mcpPollingTimer = setInterval(async () => {
                 try {
-                    const response = await fetch(MCP_SERVER_URL, { method: 'GET', mode: 'cors' });
+                    const response = await fetch(currentMcpUrl, { method: 'GET', mode: 'cors' });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     
                     const data = await response.json();
                     
-                    // 静默跳过 null
                     if (data && data.command === null) return;
 
                     if (data && data.command && data.command.action) {
@@ -210,35 +205,23 @@
                         handleIncomingCommand(data.command.action, data.command.value);
                     }
                 } catch (e) {
-                    // 静默轮询出错时不报错，防止刷屏，但可以在内存中记录最后一次错误
-                    // 为了调试，建议暂时打开下一行注释
-                    // console.error('MCP轮询错误', e); 
+                    // 静默处理网络波动，防止日志刷屏
                 }
             }, 300);
             log('MCP 服务器轮询已启动 (300ms)');
         }
 
-        // 处理 MCP 发来的指令
         function handleIncomingCommand(action, value) {
-            // ⚠️ 这里就是对应你填的指令格式的地方！
-            // 目前默认将指令转为 JSON 发给蓝牙
-            // 如果 iRobot 有专门的十六进制格式，请在这里修改！
-            
-            // 例如：如果 action 是 "震动"，发送 JSON
+            // 目前默认将 MCP 指令转为 JSON 发给蓝牙。
+            // 等你知道 iRobot 的十六进制指令后，可以在这里修改。
             writeBLE({ action: action, value: value });
-            
-            // 如果要发送原始数据，比如 0x01 0x03，请改写成：
-            // const hexData = new Uint8Array([0x01, 0x03]);
-            // bleWriteCharacteristic.writeValue(hexData);
         }
 
-        // UI 触发发送指令
         function sendCommand(action, value) {
             log(`⬆️ 手动发送: ${action} - ${value}`);
             handleIncomingCommand(action, value);
         }
 
-        // 停止所有
         function stopAll() {
             if (mcpPollingTimer) {
                 clearInterval(mcpPollingTimer);
@@ -249,21 +232,28 @@
             mcpStatus.className = 'status-err';
             
             if (bleWriteCharacteristic) {
-                // 发送急停指令（假设）
                 writeBLE({ action: 'stop', value: 0 });
             }
             
             log('🛑 已停止所有功能和轮询');
         }
 
-        // 测试连接
         function testConnection() {
             log('▶️ 测试功能...');
             sendCommand('测试', 1);
         }
 
-        // 启动按钮
+        // 启动按钮逻辑
         document.getElementById('btn-start').addEventListener('click', async () => {
+            const urlInput = document.getElementById('mcp-url-input').value.trim();
+            
+            // 检查是否填了地址
+            if (!urlInput) {
+                alert('请先在上方输入 MCP 服务器地址！');
+                return;
+            }
+            
+            currentMcpUrl = urlInput;
             document.getElementById('btn-start').style.display = 'none';
             document.getElementById('control-panel').style.display = 'block';
             
